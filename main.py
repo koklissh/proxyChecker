@@ -42,7 +42,7 @@ async def job_async():
 
 
 def job():
-    asyncio.run(job_async())
+    asyncio.get_event_loop().run_until_complete(job_async())
 
 
 def run_schedule():
