@@ -1,6 +1,7 @@
 from discord_webhook import DiscordWebhook, DiscordEmbed
 import config
 import traceback
+import requests
 
 
 def send_webhook(added_count, removed_count, working_proxies):
@@ -11,7 +12,7 @@ def send_webhook(added_count, removed_count, working_proxies):
         return
     
     try:
-        webhook = DiscordWebhook(url=config.DISCORD_WEBHOOK_URL, timeout=30)
+        webhook = DiscordWebhook(url=config.DISCORD_WEBHOOK_URL, timeout=60)
         
         total = len(working_proxies)
         avg_ping = 0
@@ -41,8 +42,29 @@ def send_webhook(added_count, removed_count, working_proxies):
                 embed2.add_embed_field(name="", value="\n".join(proxy_list), inline=False)
                 webhook.add_embed(embed2)
         
-        response = webhook.execute()
-        print(f"[WEBHOOK] Sent successfully! Total: {total}")
+        # Send via direct requests with proxy support
+        payload = webhook.get_json()
+        headers = {'Content-Type': 'application/json'}
+        
+        # Use proxy from working proxies if available
+        proxy_for_webhook = None
+        if working_proxies:
+            proxy_for_webhook = f"http://{working_proxies[0]['ip']}:{working_proxies[0]['port']}"
+        
+        proxies_dict = {'http': proxy_for_webhook, 'https': proxy_for_webhook} if proxy_for_webhook else None
+        
+        response = requests.post(
+            config.DISCORD_WEBHOOK_URL, 
+            json=payload, 
+            headers=headers, 
+            timeout=60,
+            proxies=proxies_dict
+        )
+        
+        if response.status_code in [200, 204]:
+            print(f"[WEBHOOK] Sent successfully! Status: {response.status_code}")
+        else:
+            print(f"[WEBHOOK] Error: {response.status_code} - {response.text}")
         
     except Exception as e:
         print(f"[WEBHOOK] Error: {type(e).__name__}: {e}")
