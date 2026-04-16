@@ -9,8 +9,16 @@ def parse_ipspeed(html):
     soup = BeautifulSoup(html, 'html.parser')
     table = soup.find('table', class_='table')
     if not table:
+        table = soup.find('table')
+    if not table:
+        print("Table not found in HTML")
         return proxies
+    print(f"Found table: {table.get('class')}")
     rows = table.find_all('tr')[1:]
+    print(f"Found {len(rows)} rows")
+    for i, row in enumerate(rows):
+        cells = row.find_all('td')
+        print(f"Row {i}: {len(cells)} cells")
     for row in rows:
         cells = row.find_all('td')
         if len(cells) < 6:
