@@ -89,14 +89,20 @@ def parse_proxies():
     proxies = []
     for url in config.PROXY_SOURCES:
         try:
+            print(f"Fetching {url}...")
             response = requests.get(url, timeout=30, headers={
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             })
+            print(f"Response status: {response.status_code}, length: {len(response.text)}")
             response.encoding = 'utf-8'
             if 'ipspeed' in url:
-                proxies.extend(parse_ipspeed(response.text))
+                proxies_ext = parse_ipspeed(response.text)
+                print(f"Parsed {len(proxies_ext)} from ipspeed")
+                proxies.extend(proxies_ext)
             elif 'geonix' in url:
-                proxies.extend(parse_geonix(response.text))
+                proxies_ext = parse_geonix(response.text)
+                print(f"Parsed {len(proxies_ext)} from geonix")
+                proxies.extend(proxies_ext)
         except Exception as e:
             print(f"Error parsing {url}: {e}")
     return proxies
