@@ -32,10 +32,14 @@ async def check_proxy_port(proxy, progress_callback=None, index=0, total=0):
 
 async def check_all_proxies(proxies, progress_callback=None):
     total = len(proxies)
-    connector = asyncio.LimitedSemaphore(100)
-    async with asyncio.Semaphore(100):
-        tasks = [check_proxy_port(p, progress_callback, i, total) for i, p in enumerate(proxies)]
-        results = await asyncio.gather(*tasks)
+    semaphore = asyncio.Semaphore(100)
+    
+    async def bounded_check(p, i, t):
+        async with semaphore:
+            return await check_proxy_port(p, progress_callback, i, t)
+    
+    tasks = [bounded_check(p, i, total) for i, p in enumerate(proxies)]
+    results = await asyncio.gather(*tasks)
     return [r for r in results if r is not None]
 
 
