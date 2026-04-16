@@ -24,13 +24,16 @@ def parse_ipspeed(html):
         if len(cells) < 6:
             continue
         try:
+            print(f"Processing row with {len(cells)} cells")
             country = cells[1].get_text(strip=True)
             ip = cells[2].get_text(strip=True)
             port = cells[3].get_text(strip=True)
+            print(f"  Country: '{country}', IP: '{ip}', Port: '{port}'")
             protocol_cell = cells[4]
             protocols = [p.get_text(strip=True) for p in protocol_cell.find_all('br')]
             if not protocols:
                 protocols = [protocol_cell.get_text(strip=True)]
+            print(f"  Protocols: {protocols}")
             for protocol in protocols:
                 if protocol:
                     proxies.append({
@@ -39,8 +42,8 @@ def parse_ipspeed(html):
                         'protocol': protocol.upper(),
                         'country': country
                     })
-        except (ValueError, AttributeError):
-            continue
+        except Exception as e:
+            print(f"  Error: {e}")
     return proxies
 
 
