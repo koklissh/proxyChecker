@@ -16,6 +16,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 DB_FILE = config.DATABASE_FILE
+next_check_time = time.time()
 
 
 def progress_callback(idx, total, ip, port, success, ping):
@@ -24,6 +25,7 @@ def progress_callback(idx, total, ip, port, success, ping):
 
 
 async def job_async():
+    global next_check_time
     print(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] Starting proxy check...")
     print("=" * 40)
     
@@ -38,16 +40,21 @@ async def job_async():
     print(f"Added: {added}, Removed: {removed}")
     print("Check complete\n")
     
+    next_check_time = time.time() + (config.CHECK_INTERVAL_MINUTES * 60)
+    
     await send_proxies_to_channel(working_proxies)
     
     return len(working_proxies)
 
 
 async def send_proxies_to_channel(working_proxies):
-    channel = bot.get_channel(config.DISCORD_CHANNEL_ID) if config.DISCORD_CHANNEL_ID else None
-    
-    if not channel:
+    if not config.DISCORD_CHANNEL_ID:
         print("[Discord] Channel ID not set, skipping...")
+        return
+    
+    channel = bot.get_channel(config.DISCORD_CHANNEL_ID)
+    if not channel:
+        print(f"[Discord] Channel {config.DISCORD_CHANNEL_ID} not found!")
         return
     
     if not working_proxies:
@@ -74,16 +81,6 @@ async def send_proxies_to_channel(working_proxies):
         await channel.send(embed=embed2)
     
     print(f"[Discord] Sent {total} proxies to channel")
-
-
-def job():
-    asyncio.get_event_loop().run_until_complete(job_async())
-
-
-def run_schedule():
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
 
 
 def get_working_proxies():
@@ -153,39 +150,49 @@ async def helpp(ctx):
     await ctx.send(embed=embed)
 
 
-async def start_bot_and_check():
+async def main_loop():
+    global next_check_time
+    
     if config.DISCORD_BOT_TOKEN:
-        print(f"\n[Discord] Starting bot...")
-        asyncio.create_task(bot.start(config.DISCORD_BOT_TOKEN))
-        await asyncio.sleep(3)
+        print(f"\n[Discord] Starting bot with token {config.DISCORD_BOT_TOKEN[:20]}...")
+    
+    database.init_db(config.DATABASE_FILE)
+    
+    print("[Proxy] Running initial check...")
+    await job_async()
+    next_check_time = time.time() + (config.CHECK_INTERVAL_MINUTES * 60)
+    
+    print(f"\n[System] Bot ready! Check interval: {config.CHECK_INTERVAL_MINUTES} minutes")
+    print(f"[System] Discord: {'Enabled' if config.DISCORD_BOT_TOKEN else 'Disabled'}")
+    print(f"[System] Channel ID: {config.DISCORD_CHANNEL_ID}")
+    print("=" * 50)
+    
+    while True:
+        current_time = time.time()
         
-        print("[Discord] Bot started, running proxy check...")
-        await job_async()
+        if current_time >= next_check_time:
+            print(f"\n[{time.strftime('%H:%M:%S')}] Scheduled check triggered")
+            await job_async()
         
-        schedule.every(config.CHECK_INTERVAL_MINUTES).minutes.do(job)
-        
-        while True:
-            schedule.run_pending()
-            await asyncio.sleep(1)
+        await asyncio.sleep(10)
+
+
+async def start_bot():
+    if config.DISCORD_BOT_TOKEN:
+        async with bot:
+            await bot.start(config.DISCORD_BOT_TOKEN)
     else:
-        print("[Discord] Token not configured!")
-        job()
-        while True:
-            schedule.run_pending()
-            time.sleep(1)
+        await main_loop()
 
 
 def main():
     print("=" * 50)
     print("  Proxy Checker Bot")
     print("=" * 50)
-    print(f"Check interval: {config.CHECK_INTERVAL_MINUTES} min")
     print(f"Database: {config.DATABASE_FILE}")
     print("=" * 50)
     
-    database.init_db(config.DATABASE_FILE)
-    
-    asyncio.run(start_bot_and_check())
+    asyncio.run(start_bot())
 
 
 if __name__ == "__main__":
