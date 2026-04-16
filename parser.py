@@ -22,19 +22,19 @@ def parse_ipspeed(html):
         try:
             country = cells[1].get_text(strip=True)
             ip = cells[2].get_text(strip=True)
-            port = cells[3].get_text(strip=True)
-            protocol_cell = cells[4]
-            protocols_raw = protocol_cell.get_text(strip=True)
-            protocols = protocols_raw.split('<br>') if '<br>' in protocols_raw else [protocols_raw]
-            for protocol in protocols:
-                protocol = protocol.strip()
-                if protocol and protocol not in ['ms']:
-                    proxies.append({
-                        'ip': ip,
-                        'port': int(port),
-                        'protocol': protocol.upper(),
-                        'country': country
-                    })
+            protocol = cells[3].get_text(strip=True)
+            port = cells[4].get_text(strip=True).replace(' ms', '')
+            try:
+                port = int(port)
+            except ValueError:
+                continue
+            if protocol and port:
+                proxies.append({
+                    'ip': ip,
+                    'port': port,
+                    'protocol': protocol.upper(),
+                    'country': country
+                })
         except Exception as e:
             print(f"  Error: {e}")
     return proxies
