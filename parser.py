@@ -13,29 +13,22 @@ def parse_ipspeed(html):
     if not table:
         print("Table not found in HTML")
         return proxies
-    print(f"Found table: {table.get('class')}")
     rows = table.find_all('tr')[1:]
-    print(f"Found {len(rows)} rows")
-    for i, row in enumerate(rows):
-        cells = row.find_all('td')
-        print(f"Row {i}: {len(cells)} cells")
     for row in rows:
         cells = row.find_all('td')
         if len(cells) < 6:
             continue
         try:
-            print(f"Processing row with {len(cells)} cells")
+            # cells order: #, Country, IP, Port, Protocol, Ping, Anonymity
             country = cells[1].get_text(strip=True)
             ip = cells[2].get_text(strip=True)
             port = cells[3].get_text(strip=True)
-            print(f"  Country: '{country}', IP: '{ip}', Port: '{port}'")
             protocol_cell = cells[4]
-            protocols = [p.get_text(strip=True) for p in protocol_cell.find_all('br')]
-            if not protocols:
-                protocols = [protocol_cell.get_text(strip=True)]
-            print(f"  Protocols: {protocols}")
+            protocols_raw = protocol_cell.get_text(strip=True)
+            protocols = protocols_raw.split('<br>') if '<br>' in protocols_raw else [protocols_raw]
             for protocol in protocols:
-                if protocol:
+                protocol = protocol.strip()
+                if protocol and protocol not in ['ms']:
                     proxies.append({
                         'ip': ip,
                         'port': int(port),
