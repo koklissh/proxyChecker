@@ -1,3 +1,4 @@
+import asyncio
 import time
 import schedule
 import threading
@@ -23,24 +24,31 @@ def progress_callback(idx, total, ip, port, success, ping):
     print(f"[{idx+1}/{total}] {ip}:{port} - {status}")
 
 
-def run_schedule():
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
-
-
-def job():
+async def job_async():
     print(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] Starting proxy check...")
     print("=" * 40)
-    parsed_proxies = parser.parse_proxies()
+    
+    parsed_proxies = await parser.parse_proxies()
     print(f"\nFound {len(parsed_proxies)} proxies from sources")
-    print(f"Checking proxies... (this may take a while)\n")
+    print(f"Checking proxies...\n")
     
     working_proxies = checker.check_proxies_sync(parsed_proxies, progress_callback)
     print(f"\nWorking: {len(working_proxies)} proxies")
     added, removed = database.update_proxies(config.DATABASE_FILE, parsed_proxies, working_proxies)
     print(f"Added: {added}, Removed: {removed}")
     print("Check complete\n")
+    
+    return len(working_proxies)
+
+
+def job():
+    asyncio.run(job_async())
+
+
+def run_schedule():
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
 
 
 def get_working_proxies():
@@ -79,7 +87,7 @@ async def send_proxies(ctx):
 @bot.command(name="check")
 async def trigger_check(ctx):
     await ctx.send("🔄 Запускаю проверку прокси...")
-    parsed = parser.parse_proxies()
+    parsed = await parser.parse_proxies()
     await ctx.send(f"Найдено {len(parsed)} прокси, проверяю...")
     working = checker.check_proxies_sync(parsed)
     database.update_proxies(DB_FILE, parsed, working)
@@ -111,10 +119,10 @@ async def helpp(ctx):
     await ctx.send(embed=embed)
 
 
-def run_bot():
+async def run_bot_async():
     if config.DISCORD_BOT_TOKEN:
         print(f"\n[Discord Bot] Starting with token {config.DISCORD_BOT_TOKEN[:20]}...")
-        bot.run(config.DISCORD_BOT_TOKEN)
+        await bot.start(config.DISCORD_BOT_TOKEN)
     else:
         print("\n[Discord Bot] Token not configured, skipping...")
 
@@ -137,7 +145,7 @@ def main():
     scheduler_thread.start()
     
     if config.DISCORD_BOT_TOKEN:
-        run_bot()
+        asyncio.run(run_bot_async())
     else:
         while True:
             time.sleep(60)
