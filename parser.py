@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import config
 import re
+import json
 
 
 def parse_ipspeed(html):
@@ -19,7 +20,6 @@ def parse_ipspeed(html):
         if len(cells) < 6:
             continue
         try:
-            # cells order: #, Country, IP, Port, Protocol, Ping, Anonymity
             country = cells[1].get_text(strip=True)
             ip = cells[2].get_text(strip=True)
             port = cells[3].get_text(strip=True)
@@ -40,52 +40,23 @@ def parse_ipspeed(html):
     return proxies
 
 
-def parse_geonix(html):
+def parse_proxifly(data):
     proxies = []
-    soup = BeautifulSoup(html, 'html.parser')
-    proxy_items = soup.find_all('li', class_=re.compile(r'proxy-list__item'))
-    if not proxy_items:
-        for item in soup.find_all('div', class_=re.compile(r'proxy')):
-            ip_elem = item.find('span', class_=re.compile(r'ip'))
-            port_elem = item.find('span', class_=re.compile(r'port'))
-            if ip_elem and port_elem:
-                ip = ip_elem.get_text(strip=True)
-                port = port_elem.get_text(strip=True)
-                protocol = 'HTTPS'
-                country = item.get('data-country', '')
+    try:
+        if isinstance(data, str):
+            data = json.loads(data)
+        for item in data:
+            try:
                 proxies.append({
-                    'ip': ip,
-                    'port': int(port),
-                    'protocol': protocol,
-                    'country': country
+                    'ip': item.get('ip', ''),
+                    'port': item.get('port', 0),
+                    'protocol': item.get('protocol', 'SOCKS5').upper(),
+                    'country': item.get('geolocation', {}).get('country', '')
                 })
-    for item in proxy_items:
-        try:
-            ip_elem = item.find('span', class_='ip')
-            port_elem = item.find('span', class_='port')
-            if not ip_elem or not port_elem:
-                text = item.get_text()
-                match = re.search(r'(\d+\.\d+\.\d+\.\d+):(\d+)', text)
-                if match:
-                    ip, port = match.groups()
-                else:
-                    continue
-            else:
-                ip = ip_elem.get_text(strip=True)
-                port = port_elem.get_text(strip=True)
-            protocol = 'HTTPS'
-            country = ''
-            type_elem = item.find('span', class_=re.compile(r'type|type_'))
-            if type_elem:
-                protocol = type_elem.get_text(strip=True).upper()
-            proxies.append({
-                'ip': ip,
-                'port': int(port),
-                'protocol': protocol,
-                'country': country
-            })
-        except (ValueError, AttributeError):
-            continue
+            except Exception:
+                continue
+    except Exception as e:
+        print(f"Error parsing proxifly: {e}")
     return proxies
 
 
@@ -94,18 +65,21 @@ def parse_proxies():
     for url in config.PROXY_SOURCES:
         try:
             print(f"Fetching {url}...")
-            response = requests.get(url, timeout=30, headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            })
-            print(f"Response status: {response.status_code}, length: {len(response.text)}")
-            response.encoding = 'utf-8'
-            if 'ipspeed' in url:
+            if url.startswith('proxifly:'):
+                json_url = url.replace('proxifly:', '')
+                response = requests.get(json_url, timeout=30, headers={
+                    'User-Agent': 'Mozilla/5.0'
+                })
+                proxies_ext = parse_proxifly(response.text)
+                print(f"Parsed {len(proxies_ext)} from proxifly")
+                proxies.extend(proxies_ext)
+            elif 'ipspeed' in url:
+                response = requests.get(url, timeout=30, headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                })
+                response.encoding = 'utf-8'
                 proxies_ext = parse_ipspeed(response.text)
                 print(f"Parsed {len(proxies_ext)} from ipspeed")
-                proxies.extend(proxies_ext)
-            elif 'geonix' in url:
-                proxies_ext = parse_geonix(response.text)
-                print(f"Parsed {len(proxies_ext)} from geonix")
                 proxies.extend(proxies_ext)
         except Exception as e:
             print(f"Error parsing {url}: {e}")

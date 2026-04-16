@@ -8,5 +8,5 @@ PROXY_TEST_URLS = [
 DATABASE_FILE = "proxies.db"
 PROXY_SOURCES = [
     "https://ipspeed.info/ru/free-proxy.php",
-    # "https://free.geonix.com/ru/"  # Требует Selenium (динамическая загрузка)
+    "proxifly:https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/all/data.json"
 ]
