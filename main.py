@@ -32,7 +32,7 @@ async def job_async():
     print(f"\nFound {len(parsed_proxies)} proxies from sources")
     print(f"Checking proxies...\n")
     
-    working_proxies = checker.check_proxies_sync(parsed_proxies, progress_callback)
+    working_proxies = await checker.check_proxies_async(parsed_proxies, progress_callback)
     print(f"\nWorking: {len(working_proxies)} proxies")
     added, removed = database.update_proxies(config.DATABASE_FILE, parsed_proxies, working_proxies)
     print(f"Added: {added}, Removed: {removed}")
@@ -89,7 +89,7 @@ async def trigger_check(ctx):
     await ctx.send("🔄 Запускаю проверку прокси...")
     parsed = await parser.parse_proxies()
     await ctx.send(f"Найдено {len(parsed)} прокси, проверяю...")
-    working = checker.check_proxies_sync(parsed)
+    working = await checker.check_proxies_async(parsed)
     database.update_proxies(DB_FILE, parsed, working)
     await ctx.send(f"✅ Проверка завершена! Рабочих: {len(working)}")
 

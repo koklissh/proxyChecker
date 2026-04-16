@@ -1,5 +1,4 @@
 import asyncio
-import socket
 import time
 import config
 
@@ -25,7 +24,7 @@ async def check_proxy_port(proxy, progress_callback=None, index=0, total=0):
             'country': proxy.get('country', ''),
             'ping_ms': ping_ms
         }
-    except Exception as e:
+    except Exception:
         if progress_callback:
             progress_callback(index, total, ip, port, False, 0)
         return None
@@ -33,13 +32,15 @@ async def check_proxy_port(proxy, progress_callback=None, index=0, total=0):
 
 async def check_all_proxies(proxies, progress_callback=None):
     total = len(proxies)
-    tasks = [check_proxy_port(p, progress_callback, i, total) for i, p in enumerate(proxies)]
-    results = await asyncio.gather(*tasks)
+    connector = asyncio.LimitedSemaphore(100)
+    async with asyncio.Semaphore(100):
+        tasks = [check_proxy_port(p, progress_callback, i, total) for i, p in enumerate(proxies)]
+        results = await asyncio.gather(*tasks)
     return [r for r in results if r is not None]
 
 
-def check_proxies_sync(proxies, progress_callback=None):
-    return asyncio.run(check_all_proxies(proxies, progress_callback))
+async def check_proxies_async(proxies, progress_callback=None):
+    return await check_all_proxies(proxies, progress_callback)
 
 
 if __name__ == "__main__":
@@ -49,5 +50,5 @@ if __name__ == "__main__":
         status = f"✅ {ping}ms" if success else "❌"
         print(f"[{idx+1}/{total}] {ip}:{port} - {status}")
     
-    results = check_proxies_sync(test_proxies, progress)
+    results = asyncio.run(check_all_proxies(test_proxies, progress))
     print(f"Working: {len(results)}")
