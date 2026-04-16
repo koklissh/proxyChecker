@@ -1,0 +1,8 @@
+# Secrets - do not commit!
+config.py
+*.pyc
+__pycache__/
+proxies.db
+*.log
+venv/
+.env
