@@ -1,7 +1,6 @@
 import asyncio
 import time
 import schedule
-import threading
 import sqlite3
 import parser
 import checker
@@ -29,16 +28,52 @@ async def job_async():
     print("=" * 40)
     
     parsed_proxies = await parser.parse_proxies()
-    print(f"\nFound {len(parsed_proxies)} proxies from sources")
+    print(f"\nFound {len(parsed_proxies)} proxies")
     print(f"Checking proxies...\n")
     
     working_proxies = await checker.check_proxies_async(parsed_proxies, progress_callback)
     print(f"\nWorking: {len(working_proxies)} proxies")
+    
     added, removed = database.update_proxies(config.DATABASE_FILE, parsed_proxies, working_proxies)
     print(f"Added: {added}, Removed: {removed}")
     print("Check complete\n")
     
+    await send_proxies_to_channel(working_proxies)
+    
     return len(working_proxies)
+
+
+async def send_proxies_to_channel(working_proxies):
+    channel = bot.get_channel(config.DISCORD_CHANNEL_ID) if config.DISCORD_CHANNEL_ID else None
+    
+    if not channel:
+        print("[Discord] Channel ID not set, skipping...")
+        return
+    
+    if not working_proxies:
+        await channel.send("❌ Нет рабочих прокси!")
+        return
+    
+    total = len(working_proxies)
+    avg_ping = sum(p.get('ping_ms', 0) for p in working_proxies) // total
+    
+    embed = discord.Embed(title="🔄 Proxy Checker Update", color=0x00ff00)
+    embed.add_field(name="📊 Total Working", value=str(total), inline=True)
+    embed.add_field(name="⚡ Avg Ping", value=f"{avg_ping}ms", inline=True)
+    embed.add_field(name="⏰ Updated", value=time.strftime("%H:%M"), inline=True)
+    await channel.send(embed=embed)
+    
+    for i in range(0, min(len(working_proxies), 75), 25):
+        batch = working_proxies[i:i + 25]
+        proxy_list = [f"`{p['ip']}:{p['port']}` {p['protocol']}" for p in batch]
+        embed2 = discord.Embed(
+            title=f"📋 Proxies {i+1}-{min(i+25, total)}", 
+            color=0x3498db, 
+            description="\n".join(proxy_list)
+        )
+        await channel.send(embed=embed2)
+    
+    print(f"[Discord] Sent {total} proxies to channel")
 
 
 def job():
@@ -62,7 +97,6 @@ def get_working_proxies():
 
 @bot.command(name="proxies")
 async def send_proxies(ctx):
-    await ctx.send("🔄 Получаю рабочие прокси...")
     working = get_working_proxies()
     
     if not working:
@@ -119,36 +153,39 @@ async def helpp(ctx):
     await ctx.send(embed=embed)
 
 
-async def run_bot_async():
+async def start_bot_and_check():
     if config.DISCORD_BOT_TOKEN:
-        print(f"\n[Discord Bot] Starting with token {config.DISCORD_BOT_TOKEN[:20]}...")
-        await bot.start(config.DISCORD_BOT_TOKEN)
+        print(f"\n[Discord] Starting bot...")
+        asyncio.create_task(bot.start(config.DISCORD_BOT_TOKEN))
+        await asyncio.sleep(3)
+        
+        print("[Discord] Bot started, running proxy check...")
+        await job_async()
+        
+        schedule.every(config.CHECK_INTERVAL_MINUTES).minutes.do(job)
+        
+        while True:
+            schedule.run_pending()
+            await asyncio.sleep(1)
     else:
-        print("\n[Discord Bot] Token not configured, skipping...")
+        print("[Discord] Token not configured!")
+        job()
+        while True:
+            schedule.run_pending()
+            time.sleep(1)
 
 
 def main():
     print("=" * 50)
-    print("  Proxy Checker Bot + Discord Bot")
+    print("  Proxy Checker Bot")
     print("=" * 50)
     print(f"Check interval: {config.CHECK_INTERVAL_MINUTES} min")
     print(f"Database: {config.DATABASE_FILE}")
-    print(f"Discord Bot: {'Enabled' if config.DISCORD_BOT_TOKEN else 'Disabled'}")
     print("=" * 50)
     
     database.init_db(config.DATABASE_FILE)
     
-    job()
-    schedule.every(config.CHECK_INTERVAL_MINUTES).minutes.do(job)
-    
-    scheduler_thread = threading.Thread(target=run_schedule, daemon=True)
-    scheduler_thread.start()
-    
-    if config.DISCORD_BOT_TOKEN:
-        asyncio.run(run_bot_async())
-    else:
-        while True:
-            time.sleep(60)
+    asyncio.run(start_bot_and_check())
 
 
 if __name__ == "__main__":
