@@ -3,7 +3,7 @@ import schedule
 import parser
 import checker
 import database
-import discord_bot as dw
+import webhook_helper as dw
 import config
 
 
