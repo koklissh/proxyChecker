@@ -8,5 +8,8 @@ PROXY_TEST_URLS = [
 DATABASE_FILE = "proxies.db"
 PROXY_SOURCES = [
     "https://ipspeed.info/ru/free-proxy.php",
-    "proxifly:https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/all/data.json"
+    "proxifly:https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/all/data.json",
+    "text:https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/socks5.txt",
+    "text:https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/socks4.txt",
+    "text:https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt"
 ]
