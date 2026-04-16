@@ -2,6 +2,7 @@ from discord_webhook import DiscordWebhook, DiscordEmbed
 import config
 import traceback
 import requests
+import json
 
 
 def send_webhook(added_count, removed_count, working_proxies):
@@ -12,20 +13,25 @@ def send_webhook(added_count, removed_count, working_proxies):
         return
     
     try:
-        webhook = DiscordWebhook(url=config.DISCORD_WEBHOOK_URL, timeout=60)
-        
         total = len(working_proxies)
         avg_ping = 0
         if working_proxies:
             avg_ping = sum(p.get('ping_ms', 0) for p in working_proxies) // total
         
-        embed = DiscordEmbed(title="🔄 Proxy Checker Update", color=0x00ff00)
-        embed.add_embed_field(name="✅ Added", value=str(added_count), inline=True)
-        embed.add_embed_field(name="❌ Removed", value=str(removed_count), inline=True)
-        embed.add_embed_field(name="📊 Total Working", value=str(total), inline=True)
-        embed.add_embed_field(name="⚡ Avg Ping", value=f"{avg_ping}ms", inline=True)
-        embed.set_footer(text=f"Checked: {total} proxies")
-        webhook.add_embed(embed)
+        embeds = []
+        
+        embed1 = {
+            "title": "🔄 Proxy Checker Update",
+            "color": 65280,
+            "fields": [
+                {"name": "✅ Added", "value": str(added_count), "inline": True},
+                {"name": "❌ Removed", "value": str(removed_count), "inline": True},
+                {"name": "📊 Total Working", "value": str(total), "inline": True},
+                {"name": "⚡ Avg Ping", "value": f"{avg_ping}ms", "inline": True}
+            ],
+            "footer": {"text": f"Checked: {total} proxies"}
+        }
+        embeds.append(embed1)
         
         if working_proxies:
             proxies_per_embed = 25
@@ -38,33 +44,29 @@ def send_webhook(added_count, removed_count, working_proxies):
                     flag = f" [{country}]" if country else ""
                     proxy_list.append(f"`{p['ip']}:{p['port']}` {p['protocol']}{flag}")
                 
-                embed2 = DiscordEmbed(title=f"📋 Proxies {i+1}-{min(i+proxies_per_embed, total)}", color=0x3498db)
-                embed2.add_embed_field(name="", value="\n".join(proxy_list), inline=False)
-                webhook.add_embed(embed2)
+                embed2 = {
+                    "title": f"📋 Proxies {i+1}-{min(i+proxies_per_embed, total)}",
+                    "color": 52224,
+                    "fields": [
+                        {"name": "", "value": "\n".join(proxy_list), "inline": False}
+                    ]
+                }
+                embeds.append(embed2)
         
-        # Send via direct requests with proxy support
-        payload = webhook.get_json()
+        payload = {"embeds": embeds}
         headers = {'Content-Type': 'application/json'}
-        
-        # Use proxy from working proxies if available
-        proxy_for_webhook = None
-        if working_proxies:
-            proxy_for_webhook = f"http://{working_proxies[0]['ip']}:{working_proxies[0]['port']}"
-        
-        proxies_dict = {'http': proxy_for_webhook, 'https': proxy_for_webhook} if proxy_for_webhook else None
         
         response = requests.post(
             config.DISCORD_WEBHOOK_URL, 
-            json=payload, 
+            data=json.dumps(payload),
             headers=headers, 
-            timeout=60,
-            proxies=proxies_dict
+            timeout=60
         )
         
         if response.status_code in [200, 204]:
             print(f"[WEBHOOK] Sent successfully! Status: {response.status_code}")
         else:
-            print(f"[WEBHOOK] Error: {response.status_code} - {response.text}")
+            print(f"[WEBHOOK] Error: {response.status_code} - {response.text[:100]}")
         
     except Exception as e:
         print(f"[WEBHOOK] Error: {type(e).__name__}: {e}")
