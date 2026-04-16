@@ -1,12 +1,10 @@
 import time
 import schedule
 import threading
-import asyncio
 import sqlite3
 import parser
 import checker
 import database
-import webhook_helper as dw
 import config
 
 import discord
@@ -42,8 +40,6 @@ def job():
     print(f"\nWorking: {len(working_proxies)} proxies")
     added, removed = database.update_proxies(config.DATABASE_FILE, parsed_proxies, working_proxies)
     print(f"Added: {added}, Removed: {removed}")
-    all_working = database.get_working_proxies(config.DATABASE_FILE)
-    dw.send_webhook(added, removed, all_working)
     print("Check complete\n")
 
 
